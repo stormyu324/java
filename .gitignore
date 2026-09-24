@@ -23,3 +23,4 @@ backend/src/main/resources/static/
 *.iml
 .vscode/
 .DS_Store
+*.tsbuildinfo
