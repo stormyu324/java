@@ -69,6 +69,9 @@ export interface Status {
   accountMode: 'paper' | 'live';
   tradingEnabled: boolean;
   liveTradingEnabled: boolean;
+  /** True when every order must be confirmed by the owner (always on live accounts). */
+  approvalRequired: boolean;
+  approvalTtlMinutes: number;
   maxOrderNotional: number;
   maxOpenPositions: number;
   botSchedulerEnabled: boolean;
@@ -161,4 +164,29 @@ export interface BotRunResult {
   action: string;
   message: string;
   dryRun: boolean;
+}
+
+export interface PendingOrder {
+  id: number;
+  createdAt: string;
+  expiresAt: string;
+  source: string;
+  mode: 'paper' | 'live';
+  symbol: string;
+  action: 'BUY' | 'SELL' | 'CLOSE';
+  qty: number | null;
+  type: 'MARKET' | 'LIMIT' | null;
+  limitPrice: number | null;
+  timeInForce: 'DAY' | 'GTC' | null;
+  referencePrice: number | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'FAILED';
+  decidedAt: string | null;
+  brokerOrderId: string | null;
+  message: string | null;
+}
+
+export interface OrderOutcome {
+  status: 'SUBMITTED' | 'PENDING_APPROVAL';
+  order: Order | null;
+  pending: PendingOrder | null;
 }

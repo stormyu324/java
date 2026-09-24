@@ -163,3 +163,23 @@ button.badge { cursor: pointer; }
 .alert.warn { background: var(--warn-bg); color: var(--warn-text); }
 .alert.error { background: var(--error-bg); color: var(--error-text); }
 .alert.ok { background: var(--ok-bg); color: var(--ok-text); }
+
+.topbar a .count {
+  display: inline-block; min-width: 18px; margin-left: 6px; padding: 0 5px; border-radius: 999px;
+  background: var(--down); color: #fff; font-size: 11px; line-height: 18px; text-align: center; font-weight: 600;
+}
+.row.end { justify-content: flex-end; }
+button.ghost.danger { color: var(--down); }
+button.danger-fill { background: var(--down); border-color: var(--down); }
+
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 100; background: rgba(0, 0, 0, 0.45);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.modal {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+  width: 100%; max-width: 440px; max-height: calc(100vh - 32px); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.modal h2 { margin: 0; font-size: 17px; }
+.modal label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); }

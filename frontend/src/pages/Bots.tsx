@@ -4,6 +4,8 @@ import { useLoad } from '../hooks';
 import type { Bot, BotRunResult, Status, StrategyInfo, StrategyType } from '../types';
 import { Card, ErrorBox, ParamFields } from '../components/ui';
 import { fmtTime, fmtUsd } from '../format';
+import { notifyApprovalsChanged } from '../approvals';
+import { Link } from 'react-router-dom';
 
 interface BotForm {
   id?: number;
@@ -42,10 +44,12 @@ export function BotsPage({ status }: { status?: Status }) {
   };
 
   const run = async (bot: Bot, dryRun: boolean) => {
-    if (!dryRun && !window.confirm(`立即运行「${bot.name}」，可能会真实下单（${status?.accountMode === 'live' ? '实盘' : '模拟盘'}）。继续？`)) return;
+    const note = status?.approvalRequired ? '如有交易会生成待确认订单，需要你输入密码确认后才会下单' : '可能会直接下单';
+    if (!dryRun && !window.confirm(`立即运行「${bot.name}」（${status?.accountMode === 'live' ? '实盘' : '模拟盘'}），${note}。继续？`)) return;
     setError(undefined);
     try {
       setResult(await api.post<BotRunResult>(`/api/bots/${bot.id}/run?dryRun=${dryRun}`));
+      notifyApprovalsChanged();
       void bots.reload();
     } catch (err) {
       setError((err as Error).message);
@@ -92,6 +96,9 @@ export function BotsPage({ status }: { status?: Status }) {
         <div className="muted small explain">
           <p>机器人按日线运行：每个交易日 {status?.botCron ? <code>{status.botCron}</code> : ''}（{status?.botZone}）检查一次信号。</p>
           <p>信号为「买入」且没有持仓 → 按金额市价买入整股；信号为「卖出」且有持仓 → 全部卖出；其它情况不动。</p>
+          {status?.approvalRequired && (
+            <p><strong>当前账户需要人工确认：</strong>机器人只会生成待确认订单，你在「待确认」页输入密码后才会真正下单，{status.approvalTtlMinutes} 分钟内未确认则自动作废。</p>
+          )}
           <p>每只股票只能有一个机器人，避免互相抢仓位。建议先用「试运行」看信号，在模拟盘跑一段时间再考虑实盘。</p>
           {status && !status.botSchedulerEnabled && <p className="down">定时调度已关闭（BOTS_SCHEDULER_ENABLED=false）。</p>}
         </div>
@@ -101,6 +108,7 @@ export function BotsPage({ status }: { status?: Status }) {
         {result && (
           <div className={`alert ${result.action === 'NONE' ? '' : 'ok'}`}>
             {result.dryRun ? '试运行' : '已运行'} {result.symbol}：信号 <strong>{result.signal}</strong>，动作 <strong>{result.action}</strong>。{result.message}
+            {result.action.endsWith('_PENDING') && <> <Link to="/approvals">去确认 →</Link></>}
           </div>
         )}
         <Card title={`机器人 (${bots.data?.length ?? 0})`}>

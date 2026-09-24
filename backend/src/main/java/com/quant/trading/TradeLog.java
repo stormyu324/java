@@ -22,6 +22,7 @@ public class TradeLog {
     private String mode;
     private String symbol;
     private String side;
+    @Column(precision = 19, scale = 6)
     private BigDecimal qty;
     private String status;
     private String brokerOrderId;

@@ -7,8 +7,8 @@ import com.quant.market.Timeframe;
 import com.quant.strategy.Signal;
 import com.quant.strategy.Strategy;
 import com.quant.trading.BrokerClient;
-import com.quant.trading.BrokerModels.Order;
 import com.quant.trading.BrokerModels.Position;
+import com.quant.trading.OrderOutcome;
 import com.quant.trading.OrderRequest;
 import com.quant.trading.TradingService;
 import java.math.BigDecimal;
@@ -94,15 +94,22 @@ public class BotService {
                 return finish(bot, signal.name(), "NONE",
                         "Notional $" + bot.getNotional() + " is below one share at $" + last.close(), false);
             }
-            Order o = trading.place(new OrderRequest(bot.getSymbol(), OrderRequest.Side.BUY, shares,
+            OrderOutcome o = trading.place(new OrderRequest(bot.getSymbol(), OrderRequest.Side.BUY, shares,
                     OrderRequest.Type.MARKET, null, OrderRequest.TimeInForce.DAY), "bot:" + bot.getId());
-            return finish(bot, signal.name(), "BUY", "Bought " + shares + " shares, order " + o.status(), false);
+            if (o.status() == OrderOutcome.Status.PENDING_APPROVAL) {
+                return finish(bot, signal.name(), "BUY_PENDING", "Buy " + shares
+                        + " shares is waiting for your confirmation (#" + o.pending().getId() + ")", false);
+            }
+            return finish(bot, signal.name(), "BUY", "Bought " + shares + " shares, order " + o.order().status(), false);
         }
         if (signal == Signal.SELL && holding) {
-            Order o = trading.closePosition(bot.getSymbol(), "bot:" + bot.getId());
-            return finish(bot, signal.name(), "SELL",
-                    "Closed position of " + position.get().qty() + " shares" + (o == null ? "" : ", order " + o.status()),
-                    false);
+            OrderOutcome o = trading.closePosition(bot.getSymbol(), "bot:" + bot.getId());
+            if (o.status() == OrderOutcome.Status.PENDING_APPROVAL) {
+                return finish(bot, signal.name(), "SELL_PENDING", "Selling " + position.get().qty()
+                        + " shares is waiting for your confirmation (#" + o.pending().getId() + ")", false);
+            }
+            return finish(bot, signal.name(), "SELL", "Closed position of " + position.get().qty() + " shares"
+                    + (o.order() == null ? "" : ", order " + o.order().status()), false);
         }
         return finish(bot, signal.name(), "NONE", holding ? "Holding position" : "Staying flat", false);
     }

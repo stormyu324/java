@@ -52,7 +52,7 @@ public class TradingController {
     }
 
     @PostMapping("/orders")
-    public Order place(@Valid @RequestBody OrderRequest req) {
+    public OrderOutcome place(@Valid @RequestBody OrderRequest req) {
         return trading.place(req, "manual");
     }
 
@@ -65,7 +65,7 @@ public class TradingController {
     }
 
     @DeleteMapping("/positions/{symbol}")
-    public Order close(@PathVariable String symbol) {
+    public OrderOutcome close(@PathVariable String symbol) {
         return trading.closePosition(symbol, "manual");
     }
 

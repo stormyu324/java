@@ -15,6 +15,7 @@
 | 回测 | 均线交叉、RSI 均值回归、通道突破、买入持有；输出收益曲线、年化、最大回撤、夏普、胜率、交易明细，并与买入持有对比 |
 | 交易 | 账户资金、持仓、市价/限价下单、撤单、一键平仓、下单审计日志（包括被风控拒绝的） |
 | 自动交易 | 为某只股票配置策略机器人，每个交易日收盘前自动检查信号并下单；支持「试运行」只看信号不下单 |
+| 待确认 | 实盘账户的所有订单都在这里等你输入密码确认，确认后才发送到券商 |
 
 回测规则：日线、只做多、整股；信号在当天收盘产生，**第二天开盘成交**（避免未来函数）；可设置手续费和滑点。
 
@@ -66,6 +67,23 @@ java -jar target/quant-trader-0.1.0.jar
 
 一个 JAR 同时提供网页和 API。部署到公网时请放在 HTTPS 反向代理（如 Nginx、Caddy）后面，因为登录使用 HTTP Basic 认证。
 
+## 实盘订单必须本人确认
+
+连接实盘账户（`ALPACA_PAPER=false`）时，**任何订单都不会自动发出**，这条规则无法关闭：
+
+- 手动下单、手动平仓、机器人的买入/卖出，都只会生成一条「待确认订单」。
+- 你在「待确认」页（导航栏会显示待确认数量）查看订单详情，**输入登录密码**后才会发送到 Alpaca。浏览器保持登录状态不等于确认，必须重新输入密码。
+- 确认时会重新检查风控：交易开关、单笔金额上限（按最新价格）、持仓数量，任何一项不通过则作废。
+- 待确认订单默认 30 分钟后过期（`TRADING_APPROVAL_TTL_MINUTES`），避免过时的信号被执行。
+- 在实盘生成的订单，程序切换到模拟盘后无法确认，反之亦然。
+- 同一个机器人对同一只股票不会重复生成待确认订单。
+- 撤单不需要确认（撤单只会降低风险）。
+- 所有确认、拒绝、过期都记录在「确认记录」和「下单记录」里。
+
+想先熟悉流程，可以在模拟盘上设置 `TRADING_APPROVAL_IN_PAPER=true`。
+
+> 机器人默认在美东 15:50 运行，离收盘只有 10 分钟。如果你需要更多时间确认，可以把 `BOTS_CRON` 调早，例如 `0 0 15 * * MON-FRI`（15:00）。收盘后才确认的市价单会在下一个交易日开盘成交。
+
 ## 安全与风控
 
 - **默认只连模拟盘**。要用实盘，必须同时设置 `ALPACA_PAPER=false`（使用实盘 Key）**和** `TRADING_LIVE_ENABLED=true`，缺一个都会拒绝下单。
@@ -86,7 +104,7 @@ java -jar target/quant-trader-0.1.0.jar
 ## 测试
 
 ```bash
-cd backend && mvn test        # 指标、策略、回测引擎、风控、机器人、登录与 CSRF
+cd backend && mvn test        # 指标、策略、回测引擎、风控、订单确认、机器人、登录与 CSRF
 cd frontend && npm run typecheck
 ```
 
@@ -102,5 +120,8 @@ cd frontend && npm run typecheck
 | GET | `/api/trading/account` · `/positions` · `/orders` · `/clock` · `/logs` | 账户信息 |
 | POST | `/api/trading/orders` | 下单 |
 | DELETE | `/api/trading/orders/{id}` · `/api/trading/positions/{symbol}` | 撤单 / 平仓 |
+| GET | `/api/trading/approvals` · `?all=true` | 待确认订单 / 确认记录 |
+| POST | `/api/trading/approvals/{id}/approve` `{"password": "..."}` | 输入密码确认并发送 |
+| POST | `/api/trading/approvals/{id}/reject` | 拒绝 |
 | GET/POST/PUT/DELETE | `/api/bots` | 机器人增删改查 |
 | POST | `/api/bots/{id}/run?dryRun=true` | 立即运行（试运行不下单） |

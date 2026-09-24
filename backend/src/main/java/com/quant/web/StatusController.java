@@ -33,12 +33,14 @@ public class StatusController {
     @GetMapping("/api/status")
     public Status status() {
         return new Status(marketData.source(), alpaca.configured(), alpaca.paper() ? "paper" : "live",
-                trading.enabled(), trading.liveEnabled(), trading.maxOrderNotional(), trading.maxOpenPositions(),
+                trading.enabled(), trading.liveEnabled(), !alpaca.paper() || trading.approvalInPaper(),
+                trading.approvalTtlMinutes(), trading.maxOrderNotional(), trading.maxOpenPositions(),
                 bots.schedulerEnabled(), bots.cron(), bots.zone());
     }
 
     public record Status(String dataSource, boolean brokerConfigured, String accountMode, boolean tradingEnabled,
-                         boolean liveTradingEnabled, BigDecimal maxOrderNotional, int maxOpenPositions,
+                         boolean liveTradingEnabled, boolean approvalRequired, int approvalTtlMinutes,
+                         BigDecimal maxOrderNotional, int maxOpenPositions,
                          boolean botSchedulerEnabled, String botCron, String botZone) {
     }
 }

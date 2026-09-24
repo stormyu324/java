@@ -37,6 +37,11 @@ trading:
   max-order-notional: ${TRADING_MAX_ORDER_NOTIONAL:10000}
   # Reject new buys once this many distinct positions are open.
   max-open-positions: ${TRADING_MAX_OPEN_POSITIONS:10}
+  # On a LIVE account every order (manual, bot, close position) waits until you confirm it with your password.
+  # This cannot be turned off for live. Set true to rehearse the same flow on the paper account.
+  approval-in-paper: ${TRADING_APPROVAL_IN_PAPER:false}
+  # Unconfirmed orders expire after this many minutes, so a stale signal is never executed.
+  approval-ttl-minutes: ${TRADING_APPROVAL_TTL_MINUTES:30}
 
 bots:
   # Master switch for the scheduled strategy bots.

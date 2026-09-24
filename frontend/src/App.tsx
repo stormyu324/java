@@ -1,14 +1,34 @@
+import { useEffect } from 'react';
 import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
 import { api } from './api';
 import { useLoad } from './hooks';
-import type { Status } from './types';
+import { onApprovalsChanged } from './approvals';
+import type { PendingOrder, Status } from './types';
 import { MarketPage } from './pages/Market';
 import { BacktestPage } from './pages/Backtest';
 import { TradingPage } from './pages/Trading';
 import { BotsPage } from './pages/Bots';
+import { ApprovalsPage } from './pages/Approvals';
 
 export function App() {
   const { data: status } = useLoad(() => api.get<Status>('/api/status'));
+  const watchApprovals = !!status?.brokerConfigured;
+  const approvals = useLoad(
+    () => (watchApprovals ? api.get<PendingOrder[]>('/api/trading/approvals') : Promise.resolve([] as PendingOrder[])),
+    [watchApprovals],
+  );
+  const waiting = approvals.data?.length ?? 0;
+
+  useEffect(() => {
+    if (!watchApprovals) return;
+    const t = setInterval(() => void approvals.reload(), 20_000);
+    const off = onApprovalsChanged(() => void approvals.reload());
+    return () => { clearInterval(t); off(); };
+  }, [watchApprovals, approvals.reload]);
+
+  useEffect(() => {
+    document.title = waiting > 0 ? `(${waiting}) 待确认 · 美股量化交易` : '美股量化交易';
+  }, [waiting]);
 
   return (
     <div className="app">
@@ -18,6 +38,9 @@ export function App() {
         <NavLink to="/backtest">回测</NavLink>
         <NavLink to="/trading">交易</NavLink>
         <NavLink to="/bots">自动交易</NavLink>
+        <NavLink to="/approvals">
+          待确认{waiting > 0 && <span className="count">{waiting}</span>}
+        </NavLink>
         <div className="spacer" />
         {status && (
           <div className="badges">
@@ -43,7 +66,8 @@ export function App() {
       {status?.accountMode === 'live' && status.brokerConfigured && (
         <div className="alert error banner">
           当前连接的是<strong>实盘账户</strong>，订单会使用真实资金。
-          {status.liveTradingEnabled ? '实盘下单已开启。' : '实盘下单未开启（TRADING_LIVE_ENABLED=false），所有订单会被拒绝。'}
+          {status.liveTradingEnabled ? '实盘下单已开启，' : '实盘下单未开启（TRADING_LIVE_ENABLED=false），所有订单会被拒绝。'}
+          {status.liveTradingEnabled && <>每一笔订单都必须由你在「待确认」页输入密码确认后才会发出。</>}
         </div>
       )}
 
@@ -54,6 +78,7 @@ export function App() {
           <Route path="/backtest" element={<BacktestPage />} />
           <Route path="/trading" element={<TradingPage status={status} />} />
           <Route path="/bots" element={<BotsPage status={status} />} />
+          <Route path="/approvals" element={<ApprovalsPage status={status} />} />
         </Routes>
       </main>
     </div>

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { api } from '../api';
 import { useLoad } from '../hooks';
-import type { Account, Clock, Order, Position, Status, TradeLog } from '../types';
+import type { Account, Clock, Order, OrderOutcome, PendingOrder, Position, Status, TradeLog } from '../types';
+import { notifyApprovalsChanged } from '../approvals';
+import { ConfirmOrderDialog } from '../components/ConfirmOrderDialog';
 import { Card, ErrorBox, Stat } from '../components/ui';
 import { fmtNum, fmtPct, fmtTime, fmtUsd, signClass } from '../format';
 
@@ -11,6 +13,17 @@ export function TradingPage({ status }: { status?: Status }) {
   const positions = useLoad(() => api.get<Position[]>('/api/trading/positions'));
   const orders = useLoad(() => api.get<Order[]>('/api/trading/orders?status=all&limit=50'));
   const logs = useLoad(() => api.get<TradeLog[]>('/api/trading/logs'));
+  const [toConfirm, setToConfirm] = useState<PendingOrder>();
+  const [notice, setNotice] = useState<string>();
+
+  /** Orders that need the owner's confirmation open the password dialog straight away. */
+  const handleOutcome = (o: OrderOutcome) => {
+    if (o.status === 'PENDING_APPROVAL' && o.pending) {
+      notifyApprovalsChanged();
+      setToConfirm(o.pending);
+    }
+    refreshAll();
+  };
 
   const refreshAll = () => {
     void account.reload();
@@ -28,6 +41,14 @@ export function TradingPage({ status }: { status?: Status }) {
       </Card>
     );
   }
+
+  const closeConfirm = (result?: OrderOutcome) => {
+    setToConfirm(undefined);
+    setNotice(result?.order
+      ? `已提交到券商：${result.order.side} ${result.order.symbol}，状态 ${result.order.status}`
+      : '订单未确认，可稍后在「待确认」页处理（过期前有效）。');
+    refreshAll();
+  };
 
   const a = account.data;
   const dayPl = a ? Number(a.equity) - Number(a.last_equity) : undefined;
@@ -55,8 +76,11 @@ export function TradingPage({ status }: { status?: Status }) {
         )}
       </Card>
 
+      {notice && <div className="alert">{notice}</div>}
+      {toConfirm && <ConfirmOrderDialog order={toConfirm} onClose={closeConfirm} />}
+
       <div className="grid trading">
-        <OrderForm status={status} onPlaced={refreshAll} />
+        <OrderForm status={status} onPlaced={handleOutcome} />
         <Card title={`持仓 (${positions.data?.length ?? 0})`}>
           <ErrorBox error={positions.error} />
           <div className="scroll">
@@ -78,8 +102,8 @@ export function TradingPage({ status }: { status?: Status }) {
                     <td>
                       <ConfirmButton
                         label="平仓"
-                        confirm={`确定以市价卖出全部 ${p.symbol}？`}
-                        onConfirm={() => api.del(`/api/trading/positions/${p.symbol}`).then(refreshAll)}
+                        confirm={status?.approvalRequired ? `为 ${p.symbol} 生成平仓订单？下一步需要输入密码确认。` : `确定以市价卖出全部 ${p.symbol}？`}
+                        onConfirm={() => api.del<OrderOutcome>(`/api/trading/positions/${p.symbol}`).then(handleOutcome)}
                       />
                     </td>
                   </tr>
@@ -132,7 +156,7 @@ export function TradingPage({ status }: { status?: Status }) {
                 <tr key={l.id}>
                   <td>{fmtTime(l.time)}</td><td>{l.source}</td><td>{l.mode}</td><td className="sym">{l.symbol}</td>
                   <td>{l.side}</td><td className="num">{l.qty ?? '全部'}</td>
-                  <td><span className={`badge ${l.status === 'SUBMITTED' ? 'ok' : 'danger'}`}>{l.status}</span></td>
+                  <td><span className={`badge ${l.status === 'SUBMITTED' ? 'ok' : l.status === 'PENDING_APPROVAL' ? 'warn' : 'danger'}`}>{l.status}</span></td>
                   <td className="small">{l.message}</td>
                 </tr>
               ))}
@@ -144,7 +168,7 @@ export function TradingPage({ status }: { status?: Status }) {
   );
 }
 
-function OrderForm({ status, onPlaced }: { status?: Status; onPlaced: () => void }) {
+function OrderForm({ status, onPlaced }: { status?: Status; onPlaced: (o: OrderOutcome) => void }) {
   const [form, setForm] = useState({ symbol: '', side: 'BUY', qty: 1, type: 'MARKET', limitPrice: '', timeInForce: 'DAY' });
   const [error, setError] = useState<string>();
   const [message, setMessage] = useState<string>();
@@ -153,18 +177,20 @@ function OrderForm({ status, onPlaced }: { status?: Status; onPlaced: () => void
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const desc = `${form.side === 'BUY' ? '买入' : '卖出'} ${form.qty} 股 ${form.symbol.toUpperCase()}（${form.type === 'MARKET' ? '市价' : `限价 ${form.limitPrice}`}）`;
-    const live = status?.accountMode === 'live';
-    if (!window.confirm(`${live ? '⚠️ 实盘真实资金！\n' : ''}确认${desc}？`)) return;
+    // With confirmation required, the password dialog that follows is the confirmation step.
+    if (!status?.approvalRequired && !window.confirm(`确认${desc}？`)) return;
     setBusy(true);
     setError(undefined);
     setMessage(undefined);
     try {
-      const o = await api.post<Order>('/api/trading/orders', {
+      const o = await api.post<OrderOutcome>('/api/trading/orders', {
         ...form,
         limitPrice: form.type === 'LIMIT' ? Number(form.limitPrice) : null,
       });
-      setMessage(`已提交：${desc}，状态 ${o.status}`);
-      onPlaced();
+      setMessage(o.status === 'PENDING_APPROVAL'
+        ? `已生成待确认订单 #${o.pending?.id}：${desc}`
+        : `已提交：${desc}，状态 ${o.order?.status}`);
+      onPlaced(o);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -202,11 +228,16 @@ function OrderForm({ status, onPlaced }: { status?: Status; onPlaced: () => void
             </label>
           </div>
         )}
-        <button type="submit" disabled={busy || !status?.tradingEnabled}>{busy ? '提交中…' : '提交订单'}</button>
+        <button type="submit" disabled={busy || !status?.tradingEnabled}>
+          {busy ? '提交中…' : status?.approvalRequired ? '下一步：确认订单' : '提交订单'}
+        </button>
         <ErrorBox error={error} />
         {message && <div className="alert ok">{message}</div>}
         {status && (
-          <p className="muted small">风控：单笔上限 {fmtUsd(status.maxOrderNotional)}，最多同时持有 {status.maxOpenPositions} 只股票。</p>
+          <p className="muted small">
+            风控：单笔上限 {fmtUsd(status.maxOrderNotional)}，最多同时持有 {status.maxOpenPositions} 只股票。
+            {status.approvalRequired && ' 每笔订单都需要输入密码确认后才会发送到券商。'}
+          </p>
         )}
       </form>
     </Card>

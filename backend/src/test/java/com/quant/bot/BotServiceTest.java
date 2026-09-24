@@ -16,6 +16,7 @@ import com.quant.strategy.StrategyType;
 import com.quant.trading.BrokerClient;
 import com.quant.trading.BrokerModels.Order;
 import com.quant.trading.BrokerModels.Position;
+import com.quant.trading.OrderOutcome;
 import com.quant.trading.OrderRequest;
 import com.quant.trading.TradingService;
 import java.math.BigDecimal;
@@ -63,7 +64,7 @@ class BotServiceTest {
         StrategyBot bot = smaBot();
         when(marketData.bars(eq("AAPL"), any(), any(), any())).thenReturn(TestBars.fromCloses(90, 95, 100, 110, 120));
         when(broker.position("AAPL")).thenReturn(Optional.empty());
-        when(trading.place(any(), anyString())).thenReturn(ACCEPTED);
+        when(trading.place(any(), anyString())).thenReturn(OrderOutcome.submitted(ACCEPTED));
 
         BotRunResult r = service.run(bot.getId(), false);
 
@@ -81,6 +82,8 @@ class BotServiceTest {
         when(marketData.bars(eq("AAPL"), any(), any(), any())).thenReturn(TestBars.fromCloses(120, 110, 100, 95, 90));
         when(broker.position("AAPL")).thenReturn(Optional.of(
                 new Position("AAPL", new BigDecimal("5"), "long", null, null, null, null, null, null, null)));
+
+        when(trading.closePosition(anyString(), anyString())).thenReturn(OrderOutcome.submitted(ACCEPTED));
 
         assertThat(service.run(bot.getId(), false).action()).isEqualTo("SELL");
         verify(trading).closePosition("AAPL", "bot:" + bot.getId());

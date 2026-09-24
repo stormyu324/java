@@ -2,6 +2,7 @@ package com.quant.web;
 
 import com.quant.trading.BrokerNotConfiguredException;
 import com.quant.trading.OrderRejectedException;
+import com.quant.trading.Reauthenticator.ConfirmationDeniedException;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
@@ -37,6 +38,11 @@ public class ApiExceptionHandler {
     @ExceptionHandler(OrderRejectedException.class)
     ResponseEntity<Map<String, String>> rejected(OrderRejectedException e) {
         return error(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+    }
+
+    @ExceptionHandler(ConfirmationDeniedException.class)
+    ResponseEntity<Map<String, String>> denied(ConfirmationDeniedException e) {
+        return error(HttpStatus.FORBIDDEN, e.getMessage());
     }
 
     @ExceptionHandler(BrokerNotConfiguredException.class)
