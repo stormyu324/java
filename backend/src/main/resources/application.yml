@@ -1,0 +1,46 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: quant-trader
+  datasource:
+    url: jdbc:h2:file:${DATA_DIR:./data}/quant;AUTO_SERVER=TRUE
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+app:
+  # Single-user login. If APP_PASSWORD is empty a random password is generated and printed at startup.
+  username: ${APP_USERNAME:admin}
+  password: ${APP_PASSWORD:}
+
+alpaca:
+  key-id: ${ALPACA_KEY_ID:}
+  secret-key: ${ALPACA_SECRET_KEY:}
+  # true  -> https://paper-api.alpaca.markets (simulated money)
+  # false -> https://api.alpaca.markets       (REAL money, also requires trading.live-enabled=true)
+  paper: ${ALPACA_PAPER:true}
+  data-url: https://data.alpaca.markets
+  # "iex" is free; "sip" needs a paid Alpaca data subscription.
+  feed: ${ALPACA_FEED:iex}
+
+trading:
+  # Master kill switch for every order (manual and automated).
+  enabled: ${TRADING_ENABLED:true}
+  # Must be explicitly true before any order is sent to a live (real-money) account.
+  live-enabled: ${TRADING_LIVE_ENABLED:false}
+  # Reject any single order whose estimated value exceeds this (USD).
+  max-order-notional: ${TRADING_MAX_ORDER_NOTIONAL:10000}
+  # Reject new buys once this many distinct positions are open.
+  max-open-positions: ${TRADING_MAX_OPEN_POSITIONS:10}
+
+bots:
+  # Master switch for the scheduled strategy bots.
+  scheduler-enabled: ${BOTS_SCHEDULER_ENABLED:true}
+  # Evaluated in US Eastern time. Default: 15:50 ET on weekdays, 10 minutes before the close.
+  cron: ${BOTS_CRON:0 50 15 * * MON-FRI}
+  zone: America/New_York
