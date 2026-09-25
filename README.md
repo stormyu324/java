@@ -57,24 +57,27 @@ cd backend && APP_PASSWORD=change-me mvn spring-boot:run   # :8080
 cd frontend && npm run dev                                  # :5173，/api 代理到 :8080
 ```
 
-### 4. 用 Docker 部署到服务器（推荐）
+### 4. 部署到服务器（推荐）
 
-任何装了 Docker 的 Linux 服务器（阿里云/腾讯云/AWS 轻量服务器、家里的 NAS 都可以）：
+准备一台 Linux 服务器（Ubuntu/Debian，1 核 2G 就够，例如各家云的轻量服务器），SSH 登录后：
 
 ```bash
-git clone -b claude/us-stock-quant-trading-site-y8r0xp https://github.com/stormyu324/java.git quant && cd quant
-cp .env.example .env
-nano .env          # 填 APP_PASSWORD、ALPACA_KEY_ID、ALPACA_SECRET_KEY，保持 ALPACA_PAPER=true
-docker compose up -d --build
-docker compose logs -f     # 看启动日志
+git clone -b claude/us-stock-quant-trading-site-y8r0xp https://github.com/stormyu324/java.git quant
+cd quant && ./deploy.sh
 ```
 
-然后访问 `http://服务器IP:8080`。数据（机器人配置、下单记录）保存在 Docker 卷 `quant-data` 里，重启和升级都不会丢。
+`deploy.sh` 会：
+1. 没有 Docker 的话自动安装；
+2. 第一次运行时问你：登录用户名/密码、Alpaca **模拟盘** Key ID 和 Secret（输入不回显）、域名（可选）。答案只保存在服务器上的 `.env`（权限 600）；
+3. 构建并启动，等健康检查通过后打印访问地址。
 
-升级到新版本：`git pull && docker compose up -d --build`。
+**HTTPS**：填了域名（先把域名的 A 记录指向服务器 IP，并开放 80/443 端口）就会自动启用 Caddy 申请 Let's Encrypt 证书，访问 `https://你的域名`，8080 端口只对本机开放。不填域名则是 `http://服务器IP:8080`，只适合测试，因为密码是明文传输的。
 
-> 暴露到公网前一定要加 HTTPS（例如用 Caddy：`caddy reverse-proxy --from 你的域名 --to localhost:8080`），否则登录密码是明文传输的。
-> 服务器需要能访问 `paper-api.alpaca.markets`、`api.alpaca.markets` 和 `data.alpaca.markets`。
+**升级**：`git pull && ./deploy.sh`（保留 `.env` 和数据）。**改配置**：编辑 `.env` 后重新运行 `./deploy.sh`。**看日志**：`docker compose logs -f quant`。
+
+数据（机器人配置、下单记录、确认记录）保存在 Docker 卷 `quant-data` 里。服务器需要能访问 `paper-api.alpaca.markets`、`api.alpaca.markets` 和 `data.alpaca.markets`。
+
+也可以不用脚本：`cp .env.example .env`，编辑后执行 `docker compose up -d --build`。
 
 ### 5. 不用 Docker 打包
 

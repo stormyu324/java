@@ -1,7 +1,11 @@
-# Usage:
-#   cp .env.example .env   # fill in APP_PASSWORD and the Alpaca paper keys
-#   docker compose up -d --build
-#   open http://<server>:8080  (put HTTPS in front of it before exposing it to the internet)
+# Recommended: run ./deploy.sh on the server; it writes .env and starts everything.
+#
+# Manual use:
+#   cp .env.example .env              # fill in APP_PASSWORD and the Alpaca paper keys
+#   docker compose up -d --build      # http://<server>:8080
+#
+# With HTTPS: set DOMAIN (DNS pointing at this server), COMPOSE_PROFILES=https and BIND_ADDR=127.0.0.1
+# in .env. Caddy then gets a Let's Encrypt certificate and the app is only reachable via https://DOMAIN.
 services:
   quant:
     build: .
@@ -10,9 +14,25 @@ services:
     restart: unless-stopped
     env_file: .env
     ports:
-      - "8080:8080"
+      - "${BIND_ADDR:-0.0.0.0}:8080:8080"
     volumes:
       - quant-data:/data
 
+  caddy:
+    image: caddy:2
+    container_name: quant-caddy
+    profiles: ["https"]
+    restart: unless-stopped
+    depends_on: [quant]
+    environment:
+      DOMAIN: ${DOMAIN:-}
+    command: caddy reverse-proxy --from ${DOMAIN:-localhost} --to quant:8080
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy-data:/data
+
 volumes:
   quant-data:
+  caddy-data:
