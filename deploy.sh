@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
-# One-step deployment on a fresh Ubuntu/Debian server:
+# One-step deployment on a fresh Ubuntu/Debian server, or locally on a Mac/Linux machine with Docker:
 #   git clone -b claude/us-stock-quant-trading-site-y8r0xp https://github.com/stormyu324/java.git quant
 #   cd quant && ./deploy.sh
 # Re-running it upgrades the app and keeps the existing .env and data.
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# Docker Desktop (Mac) and users in the docker group need no sudo.
 SUDO=""
-if [ "$(id -u)" -ne 0 ]; then SUDO="sudo"; fi
+if [ "$(id -u)" -ne 0 ] && ! docker info >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then SUDO="sudo"; fi
 
 install_docker() {
   if command -v docker >/dev/null 2>&1 && $SUDO docker compose version >/dev/null 2>&1; then
     return
+  fi
+  if [ "$(uname -s)" != "Linux" ]; then
+    echo "Docker is not running. Install Docker Desktop (https://www.docker.com/products/docker-desktop/), start it, then re-run ./deploy.sh" >&2
+    exit 1
   fi
   echo "==> Installing Docker"
   curl -fsSL https://get.docker.com | $SUDO sh
@@ -86,7 +91,9 @@ main() {
       if [ -n "$domain" ]; then
         echo "Running: https://$domain   (certificate may take a minute on first start)"
       else
-        echo "Running: http://$(hostname -I 2>/dev/null | awk '{print $1}'):8080"
+        local ip
+        ip=$(hostname -I 2>/dev/null | awk '{print $1}' || true)
+        echo "Running: http://${ip:-localhost}:8080   (on this computer: http://localhost:8080)"
         echo "Note: plain http sends your password unencrypted; set a DOMAIN for HTTPS before using it over the internet."
       fi
       echo "Logs:    $SUDO docker compose logs -f quant"

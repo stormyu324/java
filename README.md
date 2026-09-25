@@ -57,9 +57,20 @@ cd backend && APP_PASSWORD=change-me mvn spring-boot:run   # :8080
 cd frontend && npm run dev                                  # :5173，/api 代理到 :8080
 ```
 
+### 在自己电脑上运行（还没有服务器时）
+
+1. 安装并打开 [Docker Desktop](https://www.docker.com/products/docker-desktop/)（Mac / Windows 都有）。
+2. 下载代码：`git clone -b claude/us-stock-quant-trading-site-y8r0xp https://github.com/stormyu324/java.git quant && cd quant`
+3. 启动：
+   - **Mac**：`./deploy.sh`（域名那一项直接回车跳过）
+   - **Windows**（PowerShell）：`copy .env.example .env`，用记事本编辑 `.env` 填密码和 Alpaca Key，然后 `docker compose up -d --build`
+4. 浏览器打开 http://localhost:8080
+
+注意：电脑关机或睡眠时，自动交易机器人不会运行（默认在北京时间凌晨 3:50/4:50 运行）。行情、回测、手动下单不受影响。
+
 ### 4. 部署到服务器（推荐）
 
-准备一台 Linux 服务器（Ubuntu/Debian，1 核 2G 就够，例如各家云的轻量服务器），SSH 登录后：
+准备一台 Linux 服务器（Ubuntu/Debian，1 核 2G 就够）。建议选**香港、新加坡或美国**地区：访问 Alpaca 更稳定，而且用域名开 HTTPS 不需要 ICP 备案（中国大陆地区的服务器需要备案才能用 80/443 端口）。SSH 登录后：
 
 ```bash
 git clone -b claude/us-stock-quant-trading-site-y8r0xp https://github.com/stormyu324/java.git quant
