@@ -57,7 +57,26 @@ cd backend && APP_PASSWORD=change-me mvn spring-boot:run   # :8080
 cd frontend && npm run dev                                  # :5173，/api 代理到 :8080
 ```
 
-### 4. 打包部署
+### 4. 用 Docker 部署到服务器（推荐）
+
+任何装了 Docker 的 Linux 服务器（阿里云/腾讯云/AWS 轻量服务器、家里的 NAS 都可以）：
+
+```bash
+git clone -b claude/us-stock-quant-trading-site-y8r0xp https://github.com/stormyu324/java.git quant && cd quant
+cp .env.example .env
+nano .env          # 填 APP_PASSWORD、ALPACA_KEY_ID、ALPACA_SECRET_KEY，保持 ALPACA_PAPER=true
+docker compose up -d --build
+docker compose logs -f     # 看启动日志
+```
+
+然后访问 `http://服务器IP:8080`。数据（机器人配置、下单记录）保存在 Docker 卷 `quant-data` 里，重启和升级都不会丢。
+
+升级到新版本：`git pull && docker compose up -d --build`。
+
+> 暴露到公网前一定要加 HTTPS（例如用 Caddy：`caddy reverse-proxy --from 你的域名 --to localhost:8080`），否则登录密码是明文传输的。
+> 服务器需要能访问 `paper-api.alpaca.markets`、`api.alpaca.markets` 和 `data.alpaca.markets`。
+
+### 5. 不用 Docker 打包
 
 ```bash
 cd frontend && npm run build

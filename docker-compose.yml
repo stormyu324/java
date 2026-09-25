@@ -1,0 +1,18 @@
+# Usage:
+#   cp .env.example .env   # fill in APP_PASSWORD and the Alpaca paper keys
+#   docker compose up -d --build
+#   open http://<server>:8080  (put HTTPS in front of it before exposing it to the internet)
+services:
+  quant:
+    build: .
+    image: quant-trader:latest
+    container_name: quant-trader
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8080:8080"
+    volumes:
+      - quant-data:/data
+
+volumes:
+  quant-data:
